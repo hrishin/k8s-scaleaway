@@ -50,13 +50,18 @@ apt-get install -y kubelet kubeadm kubectl
 apt-mark hold kubelet kubeadm kubectl
 
 # Join the cluster, retrying until the control plane is ready (up to 10 min)
+joined=false
 for i in $(seq 1 20); do
-    kubeadm join "${LB_IP}:6443" \
+    if kubeadm join "${LB_IP}:6443" \
         --token "$JOIN_TOKEN" \
         --discovery-token-unsafe-skip-ca-verification \
-        --node-name="$WORKER_NAME" && break
+        --node-name="$WORKER_NAME"; then
+        joined=true
+        break
+    fi
     echo "Join attempt $i failed, retrying in 30s..."
     sleep 30
 done
+[[ "$joined" == true ]] || { echo "ERROR: $WORKER_NAME failed to join after 20 attempts"; exit 1; }
 
 echo "Worker $WORKER_NAME joined the cluster."

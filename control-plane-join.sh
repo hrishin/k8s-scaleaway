@@ -51,16 +51,21 @@ apt-get install -y kubelet kubeadm kubectl
 apt-mark hold kubelet kubeadm kubectl
 
 # Join as an additional control plane, retrying until the first CP is ready
+joined=false
 for i in $(seq 1 20); do
-    kubeadm join "${LB_IP}:6443" \
+    if kubeadm join "${LB_IP}:6443" \
         --token "$JOIN_TOKEN" \
         --control-plane \
         --certificate-key "$CERT_KEY" \
         --discovery-token-unsafe-skip-ca-verification \
-        --node-name="$CP_NAME" && break
+        --node-name="$CP_NAME"; then
+        joined=true
+        break
+    fi
     echo "Join attempt $i failed, retrying in 30s..."
     sleep 30
 done
+[[ "$joined" == true ]] || { echo "ERROR: $CP_NAME failed to join after 20 attempts"; exit 1; }
 
 # Set up kubeconfig for the first non-root user (UID 1000)
 USER_HOME=$(getent passwd 1000 | cut -d: -f6)

@@ -63,7 +63,8 @@ kubeadm init \
     --control-plane-endpoint "${LB_IP}:6443" \
     --apiserver-cert-extra-sans="${LB_IP},${NODE_IP}" \
     --pod-network-cidr=10.0.0.0/8 \
-    --node-name="$CP_NAME"
+    --node-name="$CP_NAME" \
+    --skip-phases=addon/kube-proxy
 
 # Set up kubeconfig for the first non-root user (UID 1000)
 USER_HOME=$(getent passwd 1000 | cut -d: -f6)
@@ -86,6 +87,9 @@ rm /tmp/cilium-linux-amd64.tar.gz
 
 KUBECONFIG=/etc/kubernetes/admin.conf cilium install \
     --set routingMode=tunnel \
-    --set tunnelProtocol=vxlan
+    --set tunnelProtocol=vxlan \
+    --set kubeProxyReplacement=true \
+    --set k8sServiceHost="${LB_IP}" \
+    --set k8sServicePort=6443
 
 echo "Control plane $CP_NAME setup complete. Run: kubectl get nodes"

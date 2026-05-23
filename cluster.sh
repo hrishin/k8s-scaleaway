@@ -128,28 +128,26 @@ cmd_up() {
     ssh $(ssh_opts) root@"$cp01_ip" "$cp01_cmd" < "$REPO_DIR/control-plane-init.sh"
     ok "First control plane $first_cp is up"
 
-    # ── 5. Bootstrap additional control planes in parallel ────────────────────
+    # ── 5. Bootstrap additional control planes sequentially ──────────────────
+    # etcd quorum is sensitive to concurrent member additions — join one at a time
     local additional_cps
     additional_cps=$(echo "$cp_nodes" | tail -n +2)
-    local pids=()
 
     if [[ -n "$additional_cps" ]]; then
-        log "Bootstrapping additional control planes in parallel ..."
-        while IFS= read -r node; do
+        # Use fd 3 for the loop — ssh calls inside (wait_for_ssh, the join itself)
+        # read from fd 0 and would steal lines from the here-string if we used fd 0.
+        while IFS= read -r -u3 node; do
             local ip cmd
             ip=$(jq -r --arg n "$node" '.[$n]' cp-ips.json)
             cmd=$(jq -r --arg n "$node" '.[$n]' cp-commands.json)
             ssh-keygen -R "$ip" 2>/dev/null || true
             wait_for_ssh "$ip"
-            log "  Starting $node ($ip) in background ..."
+            log "Joining $node ($ip) ..."
             # shellcheck disable=SC2086
-            ssh $(ssh_opts) root@"$ip" "$cmd" < "$REPO_DIR/control-plane-join.sh" &
-            pids+=($!)
-        done <<< "$additional_cps"
-
-        for pid in "${pids[@]}"; do
-            wait "$pid" || die "An additional control plane bootstrap failed (pid $pid)"
-        done
+            ssh $(ssh_opts) root@"$ip" "$cmd" < "$REPO_DIR/control-plane-join.sh" \
+                || die "$node failed to join"
+            ok "$node joined"
+        done 3<<< "$additional_cps"
         ok "All additional control planes joined"
     fi
 
@@ -157,7 +155,7 @@ cmd_up() {
     pids=()
     if [[ -n "$worker_nodes" ]]; then
         log "Bootstrapping workers in parallel ..."
-        while IFS= read -r node; do
+        while IFS= read -r -u3 node; do
             local ip cmd
             ip=$(jq -r --arg n "$node" '.[$n]' worker-ips.json)
             cmd=$(jq -r --arg n "$node" '.[$n]' worker-commands.json)
@@ -167,7 +165,7 @@ cmd_up() {
             # shellcheck disable=SC2086
             ssh $(ssh_opts) root@"$ip" "$cmd" < "$REPO_DIR/worker-join.sh" &
             pids+=($!)
-        done <<< "$worker_nodes"
+        done 3<<< "$worker_nodes"
 
         for pid in "${pids[@]}"; do
             wait "$pid" || die "A worker bootstrap failed (pid $pid)"
