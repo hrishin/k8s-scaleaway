@@ -1,7 +1,8 @@
 # scaleaway — Self-Managed Kubernetes on Scaleway
 
-Provisions a self-managed Kubernetes cluster on Scaleway bare-metal instances using Pulumi (Python). Spins up control-plane nodes behind a Scaleway Load Balancer and N worker nodes, then bootstraps the cluster via kubeadm over SSH. CNI is [Cilium](https://cilium.io) with VXLAN tunneling.
-
+Provisions a self-managed Kubernetes cluster on Scaleway using VM instances using Pulumi (Python). 
+Spins up control-plane nodes behind a Scaleway Load Balancer and N worker nodes, then bootstraps the cluster via kubeadm over SSH. 
+CNI is [Cilium](https://cilium.io) with VXLAN tunneling.
 Default topology (configurable): **3 control-plane nodes + 1 worker**, `PLAY2-MICRO` instances, `fr-par-2`.
 
 ---
